@@ -1,0 +1,239 @@
+/**
+ * This is the client side JS of the Ejax project.
+ * This version uses Jquery in its called methods.
+ * Script in Jquery prior to this code to use it.
+ */
+
+class Ejax { 
+  ejjson = '';      //Received request JSON
+  bErrored = false; //Error flag
+  url = '';         //Server URL
+
+  //"Constructor" just stashes the target url
+  constructor(sUrl) {
+  this.url = sUrl;
+  }
+
+  /*
+  Send a request to a PHP class on the server then
+  run the response handler method when complete.
+
+  Using the fetch api...
+
+  Parameters:
+  theURL:     string  The URL of the service - a class
+  theMethod   string  The method of the class
+  theArgs     array   The arguments to the method
+   */
+
+/******************** Request and Response Handlers *********************/
+
+  //Request using the Fetch api
+  async request(theURL, theMethod, theArgs) {
+    this.bErrored = false; //No error has ocurred - global
+  
+    //Prep the data
+    var theData = JSON.stringify([theMethod, theArgs]);
+    
+    const theRequest = new Request(theURL, {
+      method: "POST",
+      headers:{
+        "Content-Type": "application/json; charset=utf-8"
+      },
+      body: theData
+    });
+
+    //Run the request
+    try {
+      const response = await fetch(theRequest);
+      if (!response.ok) {
+        throw new Error("Network response was not OK" + response.body);
+      }
+
+      const json = await response.json();
+      this.handleResponse(json); //Success! Handle it.
+
+    } catch (error) {
+      this.bErrored = true;
+      alert("An error occured. Your request could not be completed.");
+      console.log("Error: ", error);
+    }
+  }
+
+  /*
+  Process the response from the server
+
+  The response consiste of an array of JSON objects.
+
+  Each object defines a command that specifies:
+  1. The method to invoke.
+  2. The Id of the element on the page.
+  3. The attribute of the element to be effected.
+  4. The value to be assigned to the attribute.
+
+  Using forEach, we iterate over the commands and
+  invoke the methods specified.
+  */
+  handleResponse(data) {
+    var actions = data;
+    //Iterate over the action objects
+    actions.forEach((action) => {
+      let method = action.action; //Who to call
+      let args = action.params; //Arguments
+      this[method](args); //Do it...
+    })
+  }
+
+  //****************************** Begin Response Services Methods *****************************/
+
+  /*
+   * Editing the page content and style
+   */
+
+  // Assign the specified value to the given element's attribute
+  //assign('msg', 'innerHTML/outerHTML', "Hello $data");
+  assign(args) {
+    let id = args['id'];
+    let attribute = args['attribute'];
+    let value = args['msg'];
+
+    if (id == '' || attribute == '' || value == '') {
+      alert('In the assign method, id, attribute and value are all required.');
+      throw new Error('In assign, all parameters must be non blank".');
+      return false;
+    }
+    $('#'+id).prop(attribute, value);
+  }
+
+  // Append the specified data to the given element's attribute
+  //append(string $sTarget, string $sAttribute, string $sData)
+  append(args) {
+    let id = args['id'];
+    let property = args['prop'];
+    let value = args['value'];
+    
+    let content = $('#'+id).prop(property);
+    content = content + value;
+    $('#'+id).prop(property, content);
+  }
+
+  // Prepend the specified data to the given element's attribute
+  //prepend(string $sTarget, string $sAttribute, string $sData)
+  prepend(args) {
+    let id = args['id'];
+    let property = args['prop'];
+    let value = args['value'];
+    
+    let content = $('#'+id).prop(property);
+    content = value + content;
+    $('#'+id).prop(property, content);
+  }
+
+  // Replace a specified value with another value within the given element's attribute
+  //replace(string $sTarget, string $sAttribute, string $sSearch, string $sData)
+  replace(args) {
+    var id = args['id'];
+    var property = args['prop'];
+    var searchval = args['search'];
+    var replaceval = args['value'];
+    
+    let res = $('#'+id).prop(property);
+    res = res.replace(searchval, replaceval);    
+    $('#'+id).prop(property, res);
+  }
+
+  // Clear the text of an element
+  clearText(args) {
+    var id = args['id'];
+    $('#'+id).empty();
+  }
+
+  // Create a new element in the document
+  //create(string $sParent, string $sTag, string $sId, string $position)
+  //position takes before or after only
+  create(args) {
+    var id = args['id']; //New element id
+    var sParentId = args['parent']; //Parent id
+    var sTag = args['tag']; //Tag type - i.e. textarea
+    var position = args['position']; //Relative position - after, before
+
+    let parent = $('#'+sParentId)
+    
+    let newELement = $(sTag);   //Creat it
+    newElement.attr('id', id);  //set its id
+
+
+    //Position the new element relative to it's parent
+    switch (position) {
+    case 'after':
+      parent.after(newElement);
+      break;
+    case 'before':
+      parent.parentNode.insertBefore(newElement, parent);
+      break;
+    }
+
+  }
+
+  // Remove an element from the document
+  //remove(string $sTarget)
+  remove(args) {
+    let sTarget = args['id'];
+    document.getElementById(sTarget).remove();
+  }
+
+  //Call a JS function passing args
+  call(args) {
+    let x = args.method + '("' + args.params + '")';
+//alert(x); return;    
+    eval(x);
+  }
+
+  //Add a css value to the target id
+  addCSS(args) { //id, prop, value) {
+    let id = args['id'];
+    let prop = args['prop'];
+    let value = args['value'];
+    $('#' + id).css(prop, value);
+  }
+
+  //or remove it...
+  removeCSS(args) { //id, prop) {
+    let id = args['id'];
+    let prop = args['prop'];
+    $('#' + id).css(prop, '');
+    
+  }
+
+  /*
+  Running javascript code
+   */
+
+  // Display an alert message
+  //alert(string $sMessage)
+  alert(args) {
+    alert(args['message']);
+  }
+
+  // Execute the specified javascript code
+  //script(string $sJsCode)
+  script(args) {
+    var js = args['jscode'];
+    eval(js);
+  }
+  
+  //Call a user function in the global space.
+  //The arguments are the function name and an array of it's arguments
+  userFunc(args)
+  {
+     let funcname = args['functionName'];
+     let funcargs = args['functionArgs'];
+     
+     window[funcname](funcargs);
+  }
+  
+
+  //**************************** End of Response Service Methods *************************************
+} //Class End
+
+  
